@@ -233,9 +233,8 @@ class CartItem implements Arrayable, Jsonable
      * Set the tax rate.
      *
      * @param int|float $taxRate
-     * @return \Gloudemans\Shoppingcart\CartItem
      */
-    public function setTaxRate($taxRate)
+    public function setTaxRate($taxRate): CartItem
     {
         $this->taxRate = $taxRate;
         

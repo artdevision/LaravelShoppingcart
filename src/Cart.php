@@ -3,14 +3,16 @@
 namespace Gloudemans\Shoppingcart;
 
 use Closure;
+use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Collection;
-use Illuminate\Session\SessionManager;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Contracts\Events\Dispatcher;
 use Gloudemans\Shoppingcart\Contracts\Buyable;
 use Gloudemans\Shoppingcart\Exceptions\UnknownModelException;
 use Gloudemans\Shoppingcart\Exceptions\InvalidRowIDException;
 use Gloudemans\Shoppingcart\Exceptions\CartAlreadyStoredException;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 
 class Cart
 {
@@ -18,17 +20,14 @@ class Cart
 
     /**
      * Instance of the session manager.
-     *
-     * @var \Illuminate\Session\SessionManager
      */
-    private $session;
+    private Session $session;
 
     /**
      * Instance of the event dispatcher.
-     * 
-     * @var \Illuminate\Contracts\Events\Dispatcher
+     *
      */
-    private $events;
+    private Dispatcher $events;
 
     /**
      * Holds the current cart instance.
@@ -40,10 +39,9 @@ class Cart
     /**
      * Cart constructor.
      *
-     * @param \Illuminate\Session\SessionManager      $session
      * @param \Illuminate\Contracts\Events\Dispatcher $events
      */
-    public function __construct(SessionManager $session, Dispatcher $events)
+    public function __construct(Session $session, Dispatcher $events)
     {
         $this->session = $session;
         $this->events = $events;
@@ -55,9 +53,8 @@ class Cart
      * Set the current cart instance.
      *
      * @param string|null $instance
-     * @return \Gloudemans\Shoppingcart\Cart
      */
-    public function instance($instance = null)
+    public function instance(?string $instance = null): Cart
     {
         $instance = $instance ?: self::DEFAULT_INSTANCE;
 
@@ -71,7 +68,7 @@ class Cart
      *
      * @return string
      */
-    public function currentInstance()
+    public function currentInstance(): string
     {
         return str_replace('cart.', '', $this->instance);
     }
@@ -84,12 +81,12 @@ class Cart
      * @param int|float $qty
      * @param float     $price
      * @param array     $options
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return CartItem
      */
-    public function add($id, $name = null, $qty = null, $price = null, array $options = [])
+    public function add($id, $name = null, $qty = null, $price = null, array $options = []): CartItem
     {
         if ($this->isMulti($id)) {
-            return array_map(function ($item) {
+            return Arr::map(function ($item) {
                 return $this->add($item);
             }, $id);
         }
@@ -116,9 +113,8 @@ class Cart
      *
      * @param string $rowId
      * @param mixed  $qty
-     * @return \Gloudemans\Shoppingcart\CartItem
      */
-    public function update($rowId, $qty)
+    public function update($rowId, $qty): ?CartItem
     {
         $cartItem = $this->get($rowId);
 
@@ -143,7 +139,7 @@ class Cart
 
         if ($cartItem->qty <= 0) {
             $this->remove($cartItem->rowId);
-            return;
+            return null;
         } else {
             $content->put($cartItem->rowId, $cartItem);
         }
@@ -161,7 +157,7 @@ class Cart
      * @param string $rowId
      * @return void
      */
-    public function remove($rowId)
+    public function remove($rowId): void
     {
         $cartItem = $this->get($rowId);
 
@@ -178,9 +174,8 @@ class Cart
      * Get a cart item from the cart by its rowId.
      *
      * @param string $rowId
-     * @return \Gloudemans\Shoppingcart\CartItem
      */
-    public function get($rowId)
+    public function get($rowId): CartItem
     {
         $content = $this->getContent();
 
@@ -195,7 +190,7 @@ class Cart
      *
      * @return void
      */
-    public function destroy()
+    public function destroy(): void
     {
         $this->session->remove($this->instance);
     }
@@ -205,7 +200,7 @@ class Cart
      *
      * @return \Illuminate\Support\Collection
      */
-    public function content()
+    public function content(): Collection
     {
         if (is_null($this->session->get($this->instance))) {
             return new Collection([]);
@@ -219,7 +214,7 @@ class Cart
      *
      * @return int|float
      */
-    public function count()
+    public function count(): int|float
     {
         $content = $this->getContent();
 
@@ -234,7 +229,7 @@ class Cart
      * @param string $thousandSeperator
      * @return string
      */
-    public function total($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function total($decimals = null, $decimalPoint = null, $thousandSeperator = null): string
     {
         $content = $this->getContent();
 
@@ -253,7 +248,7 @@ class Cart
      * @param string $thousandSeperator
      * @return float
      */
-    public function tax($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function tax($decimals = null, $decimalPoint = null, $thousandSeperator = null): float
     {
         $content = $this->getContent();
 
@@ -272,7 +267,7 @@ class Cart
      * @param string $thousandSeperator
      * @return float
      */
-    public function subtotal($decimals = null, $decimalPoint = null, $thousandSeperator = null)
+    public function subtotal($decimals = null, $decimalPoint = null, $thousandSeperator = null): float
     {
         $content = $this->getContent();
 
@@ -289,7 +284,7 @@ class Cart
      * @param \Closure $search
      * @return \Illuminate\Support\Collection
      */
-    public function search(Closure $search)
+    public function search(Closure $search): Collection
     {
         $content = $this->getContent();
 
@@ -303,7 +298,7 @@ class Cart
      * @param mixed  $model
      * @return void
      */
-    public function associate($rowId, $model)
+    public function associate($rowId, $model): void
     {
         if(is_string($model) && ! class_exists($model)) {
             throw new UnknownModelException("The supplied model {$model} does not exist.");
@@ -327,7 +322,7 @@ class Cart
      * @param int|float $taxRate
      * @return void
      */
-    public function setTax($rowId, $taxRate)
+    public function setTax($rowId, $taxRate): void
     {
         $cartItem = $this->get($rowId);
 
@@ -360,7 +355,7 @@ class Cart
             'content' => serialize($content)
         ]);
 
-        $this->events->fire('cart.stored');
+        $this->events->dispatch('cart.stored');
     }
 
     /**
@@ -390,7 +385,7 @@ class Cart
             $content->put($cartItem->rowId, $cartItem);
         }
 
-        $this->events->fire('cart.restored');
+        $this->events->dispatch('cart.restored');
 
         $this->session->put($this->instance, $content);
 
@@ -445,7 +440,7 @@ class Cart
      * @param int|float $qty
      * @param float     $price
      * @param array     $options
-     * @return \Gloudemans\Shoppingcart\CartItem
+     * @return CartItem
      */
     private function createCartItem($id, $name, $qty, $price, array $options)
     {
@@ -483,7 +478,7 @@ class Cart
      * @param $identifier
      * @return bool
      */
-    private function storedCartWithIdentifierExists($identifier)
+    private function storedCartWithIdentifierExists($identifier): bool
     {
         return $this->getConnection()->table($this->getTableName())->where('identifier', $identifier)->exists();
     }
@@ -491,13 +486,13 @@ class Cart
     /**
      * Get the database connection.
      *
-     * @return \Illuminate\Database\Connection
+     * @return \Illuminate\Support\Connection
      */
     private function getConnection()
     {
         $connectionName = $this->getConnectionName();
 
-        return app(DatabaseManager::class)->connection($connectionName);
+        return DB::connection($connectionName);
     }
 
     /**
@@ -505,7 +500,7 @@ class Cart
      *
      * @return string
      */
-    private function getTableName()
+    private function getTableName(): string
     {
         return config('cart.database.table', 'shoppingcart');
     }
@@ -515,7 +510,7 @@ class Cart
      *
      * @return string
      */
-    private function getConnectionName()
+    private function getConnectionName(): string
     {
         $connection = config('cart.database.connection');
 
@@ -529,9 +524,8 @@ class Cart
      * @param $decimals
      * @param $decimalPoint
      * @param $thousandSeperator
-     * @return string
      */
-    private function numberFormat($value, $decimals, $decimalPoint, $thousandSeperator)
+    private function numberFormat($value, $decimals, $decimalPoint, $thousandSeperator): float
     {
         if(is_null($decimals)){
             $decimals = is_null(config('cart.format.decimals')) ? 2 : config('cart.format.decimals');
@@ -543,6 +537,6 @@ class Cart
             $thousandSeperator = is_null(config('cart.format.thousand_seperator')) ? ',' : config('cart.format.thousand_seperator');
         }
 
-        return number_format($value, $decimals, $decimalPoint, $thousandSeperator);
+        return (float) number_format($value, $decimals, $decimalPoint, $thousandSeperator);
     }
 }
