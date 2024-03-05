@@ -3,7 +3,7 @@
 namespace Gloudemans\Shoppingcart;
 
 use Illuminate\Auth\Events\Logout;
-use Illuminate\Session\SessionManager;
+use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\ServiceProvider;
 
 class ShoppingcartServiceProvider extends ServiceProvider
@@ -25,7 +25,7 @@ class ShoppingcartServiceProvider extends ServiceProvider
 
         $this->app['events']->listen(Logout::class, function () {
             if ($this->app['config']->get('cart.destroy_on_logout')) {
-                $this->app->make(SessionManager::class)->forget('cart');
+                $this->app->make(Session::class)->forget('cart');
             }
         });
 

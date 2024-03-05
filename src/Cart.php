@@ -5,13 +5,11 @@ namespace Gloudemans\Shoppingcart;
 use Closure;
 use Illuminate\Contracts\Session\Session;
 use Illuminate\Support\Collection;
-use Illuminate\Database\DatabaseManager;
 use Illuminate\Contracts\Events\Dispatcher;
 use Gloudemans\Shoppingcart\Contracts\Buyable;
 use Gloudemans\Shoppingcart\Exceptions\UnknownModelException;
 use Gloudemans\Shoppingcart\Exceptions\InvalidRowIDException;
 use Gloudemans\Shoppingcart\Exceptions\CartAlreadyStoredException;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class Cart
@@ -83,10 +81,10 @@ class Cart
      * @param array     $options
      * @return CartItem
      */
-    public function add($id, $name = null, $qty = null, $price = null, array $options = []): CartItem
+    public function add($id, $name = null, $qty = null, $price = null, array $options = []): CartItem|array
     {
         if ($this->isMulti($id)) {
-            return Arr::map(function ($item) {
+            return array_map(function ($item) {
                 return $this->add($item);
             }, $id);
         }
